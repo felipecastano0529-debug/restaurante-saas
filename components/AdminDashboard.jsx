@@ -19,9 +19,17 @@ const STATUS_COLORS = {
 export default function AdminDashboard({ restaurantId }) {
   const [orders, setOrders]     = useState([])
   const [loading, setLoading]   = useState(true)
+  const [restaurant, setRestaurant] = useState(null)
   const [view, setView]         = useState('orders')  // orders | analytics
   const [newOrderAlert, setNewOrderAlert] = useState(false)
   const audioRef = useRef(null)
+
+  // Cargar datos del restaurante y su estado de suscripción
+  useEffect(() => {
+    if (!restaurantId) return
+    supabase.from('restaurants').select('*').eq('id', restaurantId).single()
+      .then(({ data }) => setRestaurant(data))
+  }, [restaurantId])
 
   // Cargar órdenes del día desde Supabase
   useEffect(() => {
@@ -64,11 +72,33 @@ export default function AdminDashboard({ restaurantId }) {
   const totalHoy = orders.filter(o => o.payment_status === 'paid' || o.payment_method === 'cash').reduce((s, o) => s + (o.total_price || 0), 0)
   const pendientes = orders.filter(o => ['received', 'kitchen', 'ready'].includes(o.status)).length
 
-  if (loading) return (
+  if (loading || !restaurant) return (
     <div style={{ display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh' }}>
       <div style={{ textAlign:'center' }}>
         <div className="spin" style={{ width:40, height:40, margin:'0 auto 12px' }} />
         <div style={{ color:'#888', fontSize:14 }}>Cargando dashboard…</div>
+      </div>
+    </div>
+  )
+
+  // Lógica de expiración del Trial
+  const trialEnds = new Date(restaurant.trial_ends_at)
+  const todayDate = new Date()
+  const diffDays = Math.ceil((trialEnds - todayDate) / (1000 * 60 * 60 * 24))
+  const isExpired = restaurant.subscription_status === 'trial' && diffDays <= 0
+
+  if (isExpired) return (
+    <div style={{ minHeight:'100vh', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center', padding:24, textAlign:'center', color:'#fff' }}>
+      <div className="card animate-scale-in" style={{ padding:48, maxWidth:450, background:'#fff', color:'#1a1a2e' }}>
+        <div style={{ fontSize:64, marginBottom:24 }}>⌛</div>
+        <h2 style={{ fontSize:28, fontWeight:800, marginBottom:16 }}>Tu prueba ha expirado</h2>
+        <p style={{ color:'#666', fontSize:16, lineHeight:1.6, marginBottom:32 }}>
+          Tus 14 días de prueba gratuita han terminado. Para seguir gestionando tus pedidos y recibir clientes, activa tu plan profesional.
+        </p>
+        <button style={{ width:'100%', padding:18, background:'#E85D04', color:'#fff', border:'none', borderRadius:14, fontSize:16, fontWeight:800, cursor:'pointer' }}>
+          Activar Plan Pro (Cop $49.000/mes)
+        </button>
+        <button onClick={() => window.location.href = '/admin'} style={{ background:'none', border:'none', color:'#888', marginTop:16, fontSize:14, cursor:'pointer', fontWeight:600 }}>Cerrar sesión</button>
       </div>
     </div>
   )
@@ -85,11 +115,19 @@ export default function AdminDashboard({ restaurantId }) {
         </div>
       )}
 
+      {/* Banner de Trial */}
+      {restaurant.subscription_status === 'trial' && diffDays > 0 && (
+        <div style={{ background:'linear-gradient(90deg, #E85D04, #F48C06)', color:'#fff', padding:'8px 24px', fontSize:13, fontWeight:600, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span>🎁 Tienes <strong>{diffDays} días</strong> restantes de prueba gratuita.</span>
+          <button style={{ background:'#fff', color:'#E85D04', border:'none', padding:'4px 12px', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer' }}>Suscribirme ahora</button>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ background:'#1a1a2e', color:'#fff', padding:'16px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div>
           <div style={{ fontWeight:700, fontSize:18 }}>Panel Admin</div>
-          <div style={{ fontSize:12, opacity:.7 }}>La Brasería — {new Date().toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })}</div>
+          <div style={{ fontSize:12, opacity:.7 }}>{restaurant.name} — {new Date().toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })}</div>
         </div>
         <div style={{ display:'flex', gap:8 }}>
           {['orders','analytics'].map(v => (

@@ -23,9 +23,13 @@ export default function AdminLoginPage() {
         if (error) throw error
         setError('✅ Revisa tu email para confirmar tu cuenta.')
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        router.push('/admin/dashboard')
+        const { data: { user }, error: loginError } = await supabase.auth.signInWithPassword({ email, password })
+        if (loginError) throw loginError
+        
+        // Verificar si tiene restaurante
+        const { data: rest } = await supabase.from('restaurants').select('id').eq('owner_id', user.id).single()
+        if (rest) router.push('/admin/dashboard')
+        else router.push('/admin/onboarding')
       }
     } catch (err) {
       setError(err.message)

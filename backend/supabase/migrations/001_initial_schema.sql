@@ -21,6 +21,7 @@ CREATE TABLE restaurants (
   primary_color             VARCHAR(7) DEFAULT '#E85D04',
   address                   TEXT,
   transfer_info             TEXT,      -- Nequi, BANCO, etc.
+  trial_ends_at             TIMESTAMPTZ, -- Fecha fin de prueba
   subscription_status       VARCHAR(20) DEFAULT 'trial' CHECK (subscription_status IN ('trial','active','suspended')),
   next_billing_date         TIMESTAMPTZ,
   mp_access_token           TEXT,      -- Cifrado en producción (Vault de Supabase)
