@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, seedNewRestaurantMenu } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function OnboardingPage() {
@@ -8,6 +8,7 @@ export default function OnboardingPage() {
   const [slug, setSlug] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [loading, setLoading] = useState(false)
+  const [statusText, setStatusText] = useState('')
   const [error, setError] = useState('')
   const router = useRouter()
 
@@ -27,6 +28,7 @@ export default function OnboardingPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setStatusText('Creando tu cuenta...')
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -35,20 +37,24 @@ export default function OnboardingPage() {
       const trialEndsAt = new Date()
       trialEndsAt.setDate(trialEndsAt.getDate() + 14)
 
-      const { error: insError } = await supabase.from('restaurants').insert({
+      const { data: rest, error: insError } = await supabase.from('restaurants').insert({
         name,
         slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, ''),
         whatsapp_number: whatsapp,
         owner_id: user.id,
         trial_ends_at: trialEndsAt.toISOString(),
         subscription_status: 'trial'
-      })
+      }).select().single()
 
       if (insError) throw insError
+
+      // SEEDING: Cargar el menú de ejemplo premium
+      setStatusText('Diseñando tu menú premium...')
+      await seedNewRestaurantMenu(rest.id)
+
       router.push('/admin/dashboard')
     } catch (err) {
       setError(err.message)
-    } finally {
       setLoading(false)
     }
   }
@@ -69,6 +75,7 @@ export default function OnboardingPage() {
               value={name} onChange={e => { setName(e.target.value); if(!slug) setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-')) }}
               placeholder="Ej: La Brasería" required
               style={{ width:'100%', padding:'12px 16px', borderRadius:12, border:'1.5px solid #eee', fontSize:15, outline:'none' }}
+              disabled={loading}
             />
           </div>
 
@@ -80,6 +87,7 @@ export default function OnboardingPage() {
                 value={slug} onChange={e => setSlug(e.target.value)}
                 placeholder="la-braseria" required
                 style={{ flex:1, padding:'12px 8px', background:'transparent', border:'none', fontSize:15, outline:'none', fontWeight:600 }}
+                disabled={loading}
               />
             </div>
           </div>
@@ -90,6 +98,7 @@ export default function OnboardingPage() {
               value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
               placeholder="Ej: 573234187831" required
               style={{ width:'100%', padding:'12px 16px', borderRadius:12, border:'1.5px solid #eee', fontSize:15, outline:'none' }}
+              disabled={loading}
             />
           </div>
 
@@ -97,9 +106,14 @@ export default function OnboardingPage() {
 
           <button 
             type="submit" disabled={loading}
-            style={{ width:'100%', padding:16, background:'#E85D04', color:'#fff', border:'none', borderRadius:14, fontSize:16, fontWeight:800, cursor:'pointer', marginTop:10 }}
+            style={{ width:'100%', padding:16, background:'#E85D04', color:'#fff', border:'none', borderRadius:14, fontSize:16, fontWeight:800, cursor:'pointer', marginTop:10, opacity: loading ? .7 : 1 }}
           >
-            {loading ? 'Creando...' : 'Comenzar mi Prueba Gratis'}
+            {loading ? (
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+                <div className="spin" style={{ width:16, height:16 }} />
+                <span>{statusText}</span>
+              </div>
+            ) : 'Comenzar mi Prueba Gratis'}
           </button>
         </form>
       </div>
